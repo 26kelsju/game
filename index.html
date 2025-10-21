@@ -29,7 +29,19 @@
         
         <!-- Score display -->
         <a-text id="scoreText" position="0 3 -3" value="Score: 0" align="center" color="black"></a-text>
+        
+        <!-- Add this with your other UI elements -->
+        <a-text id="timerText" position="0 3.5 -3" value="Time: 30" align="center" color="red"></a-text>
+
+        <!-- Game Over Screen (initially hidden) -->
+        <a-plane id="gameOverScreen" position="0 0 -2" width="6" height="4" color="black" opacity="0.8" visible="false">
+            <a-text id="gameOverText" position="0 0.5 0.01" value="GAME OVER!" align="center" color="red"></a-text>
+            <a-text id="finalScoreText" position="0 0 0.01" value="Final Score: 0" align="center" color="white"></a-text>
+            <a-text id="restartText" position="0 -0.5 0.01" value="Look at this screen to restart" align="center" color="yellow"></a-text>
+        </a-plane>
+        
     </a-scene>
 </body>
 
 </html>
+
