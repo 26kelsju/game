@@ -25,6 +25,10 @@
         <a-box id="speedControl" position="3 2 -3" width="1" height="0.5" depth="0.1" color="blue">
             <a-text value="SPEED" position="0 0 0.06" align="center" color="white"></a-text>
         </a-box>
+
+        <a-box id="shapeControl" position="0 2 -3" width="1" height="0.5" depth="0.1" color="green">
+            <a-text value="SHAPE" position="0 0 0.06" align="center" color="white"></a-text>
+        </a-box>
         
         <!-- Score and Timer display -->
         <a-text id="scoreText" position="0 3 -3" value="Score: 0" align="center" color="black"></a-text>
@@ -47,7 +51,12 @@
         let timeLeft = 30;
         let gameTimer;
         let spawnInterval;
+        let targetShape = 'cylinder'; // cylinder, box, sphere, cone
+        let shapeIndex = 0;
+        const shapes = ['cylinder', 'box', 'sphere', 'cone'];
+        const shapeColors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44'];
 
+        
         // Wait for A-frame scene to load
         document.querySelector('a-scene').addEventListener('loaded', function() {
             console.log('Scene loaded, starting game...');
@@ -142,31 +151,54 @@
 
         function spawnTarget() {
             if (!gameActive) return;
-            
+    
             const scene = document.querySelector('a-scene');
-            const target = document.createElement('a-cylinder');
-            
+            let target;
+    
             // Random position
             const x = (Math.random() - 0.5) * 8;
             const startY = -2;
             const z = (Math.random() - 0.5) * 4 - 3;
             
-            // Set target properties
+            // Create different shapes based on current setting
+            switch(targetShape) {
+                case 'cylinder':
+                    target = document.createElement('a-cylinder');
+                    target.setAttribute('radius', targetSize);
+                    target.setAttribute('height', '0.2');
+                break;
+                case 'box':
+                    target = document.createElement('a-box');
+                    target.setAttribute('width', targetSize);
+                    target.setAttribute('height', targetSize);
+                    target.setAttribute('depth', targetSize);
+                break;
+            case 'sphere':
+                    target = document.createElement('a-sphere');
+                    target.setAttribute('radius', targetSize * 0.7);
+                break;
+            case 'cone':
+                    target = document.createElement('a-cone');
+                    target.setAttribute('radius-bottom', targetSize);
+                    target.setAttribute('radius-top', '0');
+                    target.setAttribute('height', targetSize * 1.5);
+                break;
+            }
+    
+            // Set common properties
             target.setAttribute('position', `${x} ${startY} ${z}`);
-            target.setAttribute('radius', targetSize);
-            target.setAttribute('height', '0.2');
-            target.setAttribute('color', '#ff4444');
+            target.setAttribute('color', shapeColors[shapeIndex]);
             target.setAttribute('class', 'target');
-            
+    
             // Add click event for destruction
             target.addEventListener('click', function() {
                 if (gameActive) {
                     destroyTarget(target);
                 }
             });
-            
+    
             scene.appendChild(target);
-            
+    
             // Animate target up and down
             animateTarget(target, x, z);
         }
@@ -229,7 +261,7 @@
                 targetSize = targetSize >= 1.5 ? 0.5 : targetSize + 0.25;
                 this.setAttribute('color', targetSize > 1 ? 'darkred' : 'red');
             });
-            
+    
             // Speed control
             document.querySelector('#speedControl').addEventListener('click', function() {
                 if (!gameActive) return;
@@ -241,8 +273,26 @@
                     this.setAttribute('color', 'blue');
                 }
             });
+    
+            // Shape control - NEW!
+            document.querySelector('#shapeControl').addEventListener('click', function() {
+                if (!gameActive) return;
+                
+                // Cycle through shapes
+                shapeIndex = (shapeIndex + 1) % shapes.length;
+                targetShape = shapes[shapeIndex];
+        
+                // Update button color to match current shape
+                this.setAttribute('color', shapeColors[shapeIndex]);
+        
+                // Update button text to show current shape
+                const shapeText = this.querySelector('a-text');
+                shapeText.setAttribute('value', targetShape.toUpperCase());
+            });
+}
         }
     </script>
 </body>
 </html>
+
 
