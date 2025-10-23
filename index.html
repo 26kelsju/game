@@ -5,29 +5,16 @@
 </head>
 <body>
     <a-scene background="color: #87CEEB" vr-mode-ui="enabled: true">
-        <!-- Assets for controller models -->
-        <a-assets>
-            <a-mixin id="controller-right" 
-                     oculus-touch-controls="hand: right" 
-                     raycaster="objects: .target, .control, .gameOver"
-                     line="color: red; opacity: 0.75">
-            </a-mixin>
-            <a-mixin id="controller-left" 
-                     oculus-touch-controls="hand: left" 
-                     raycaster="objects: .target, .control, .gameOver"
-                     line="color: blue; opacity: 0.75">
-            </a-mixin>
-        </a-assets>
-
-        <!-- VR Camera rig with movement controls -->
+        <!-- VR Camera rig with proper movement controls -->
         <a-entity id="rig" 
-                  position="0 1.6 3" 
-                  movement-controls="fly: false; constrainToNavMesh: false"
-                  wasd-controls="enabled: true; acceleration: 20"
-                  look-controls="enabled: true">
+                  position="0 0 3" 
+                  movement-controls="fly: true; constrainToNavMesh: false; speed: 0.1">
             
-            <!-- Camera with cursor for non-VR mode -->
-            <a-camera>
+            <!-- Camera -->
+            <a-camera id="camera" 
+                      position="0 1.6 0"
+                      wasd-controls="acceleration: 20"
+                      look-controls="pointerLockEnabled: true">
                 <a-cursor 
                     position="0 0 -1"
                     geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
@@ -36,16 +23,14 @@
                 </a-cursor>
             </a-camera>
             
-            <!-- VR Controllers with movement -->
+            <!-- VR Controllers -->
             <a-entity id="rightController" 
-                      mixin="controller-right"
                       oculus-touch-controls="hand: right"
                       raycaster="objects: .target, .control, .gameOver; lineColor: red; lineOpacity: 0.5"
                       line="color: red; opacity: 0.75">
             </a-entity>
             
             <a-entity id="leftController" 
-                      mixin="controller-left"
                       oculus-touch-controls="hand: left"
                       raycaster="objects: .target, .control, .gameOver; lineColor: blue; lineOpacity: 0.5"
                       line="color: blue; opacity: 0.75">
@@ -53,7 +38,7 @@
         </a-entity>
         
         <!-- Expanded Ground for movement -->
-        <a-plane position="0 0 -4" rotation="-90 0 0" width="40" height="40" color="#4CC3D9"></a-plane>
+        <a-plane position="0 0 0" rotation="-90 0 0" width="40" height="40" color="#4CC3D9"></a-plane>
         
         <!-- Control panel -->
         <a-box id="sizeControl" class="control" position="-3 2 -3" width="1" height="0.5" depth="0.1" color="red">
@@ -69,7 +54,7 @@
         </a-box>
         
         <!-- Movement Instructions -->
-        <a-text id="movementInstructions" position="0 4 -3" value="VR: Use thumbsticks to move | Desktop: WASD keys" align="center" color="white"></a-text>
+        <a-text id="movementInstructions" position="0 4 -3" value="VR: Left thumbstick moves | Right thumbstick turns | Desktop: WASD + mouse" align="center" color="white"></a-text>
         
         <!-- Score and Timer display -->
         <a-text id="scoreText" position="0 3 -3" value="Score: 0" align="center" color="black"></a-text>
@@ -81,12 +66,6 @@
             <a-text id="finalScoreText" position="0 0 0.01" value="Final Score: 0" align="center" color="white"></a-text>
             <a-text id="restartText" position="0 -0.5 0.01" value="Point and click to restart" align="center" color="yellow"></a-text>
         </a-plane>
-
-        <!-- Boundaries (invisible walls) -->
-        <a-box position="20 2 0" width="1" height="4" depth="40" color="red" opacity="0.3" visible="false"></a-box>
-        <a-box position="-20 2 0" width="1" height="4" depth="40" color="red" opacity="0.3" visible="false"></a-box>
-        <a-box position="0 2 20" width="40" height="4" depth="1" color="red" opacity="0.3" visible="false"></a-box>
-        <a-box position="0 2 -20" width="40" height="4" depth="1" color="red" opacity="0.3" visible="false"></a-box>
     </a-scene>
 
     <script>
@@ -102,18 +81,11 @@
         let shapeIndex = 0;
         const shapes = ['cylinder', 'box', 'sphere', 'cone'];
         const shapeColors = ['#ff4444', '#44ff44', '#4444ff', '#ffff44'];
-        
-        // Movement variables
-        let rig;
-        let moveSpeed = 0.1;
-        let isMoving = false;
 
         // Wait for A-frame scene to load
         document.querySelector('a-scene').addEventListener('loaded', function() {
             console.log('Scene loaded, starting game...');
-            rig = document.querySelector('#rig');
             setupVRControllers();
-            setupMovementControls();
             startGame();
         });
 
@@ -125,114 +97,14 @@
             if (rightController) {
                 rightController.addEventListener('triggerdown', handleControllerClick);
                 rightController.addEventListener('gripdown', handleControllerClick);
-                
-                // Right thumbstick for movement
-                rightController.addEventListener('thumbstickmoved', handleRightThumbstick);
             }
             
             if (leftController) {
                 leftController.addEventListener('triggerdown', handleControllerClick);
                 leftController.addEventListener('gripdown', handleControllerClick);
-                
-                // Left thumbstick for movement
-                leftController.addEventListener('thumbstickmoved', handleLeftThumbstick);
             }
             
             console.log('VR controllers setup complete');
-        }
-
-        function setupMovementControls() {
-            // Desktop keyboard controls
-            document.addEventListener('keydown', function(event) {
-                if (!gameActive) return;
-                
-                const currentPos = rig.getAttribute('position');
-                let newPos = {x: currentPos.x, y: currentPos.y, z: currentPos.z};
-                
-                switch(event.code) {
-                    case 'KeyW': // Forward
-                        newPos.z -= moveSpeed * 5;
-                        break;
-                    case 'KeyS': // Backward
-                        newPos.z += moveSpeed * 5;
-                        break;
-                    case 'KeyA': // Left
-                        newPos.x -= moveSpeed * 5;
-                        break;
-                    case 'KeyD': // Right
-                        newPos.x += moveSpeed * 5;
-                        break;
-                    case 'KeyQ': // Up
-                        newPos.y += moveSpeed * 5;
-                        break;
-                    case 'KeyE': // Down
-                        newPos.y -= moveSpeed * 5;
-                        break;
-                }
-                
-                // Apply boundaries
-                newPos = applyBoundaries(newPos);
-                rig.setAttribute('position', newPos);
-            });
-        }
-
-        function handleRightThumbstick(event) {
-            if (!gameActive) return;
-            
-            // Right thumbstick controls X and Z movement
-            const x = event.detail.x;
-            const y = event.detail.y;
-            
-            if (Math.abs(x) > 0.1 || Math.abs(y) > 0.1) {
-                const currentPos = rig.getAttribute('position');
-                let newPos = {
-                    x: currentPos.x + (x * moveSpeed),
-                    y: currentPos.y,
-                    z: currentPos.z - (y * moveSpeed) // Inverted for natural movement
-                };
-                
-                newPos = applyBoundaries(newPos);
-                rig.setAttribute('position', newPos);
-            }
-        }
-
-        function handleLeftThumbstick(event) {
-            if (!gameActive) return;
-            
-            // Left thumbstick controls Y movement and rotation
-            const x = event.detail.x;
-            const y = event.detail.y;
-            
-            if (Math.abs(y) > 0.1) {
-                // Y movement (up/down)
-                const currentPos = rig.getAttribute('position');
-                let newPos = {
-                    x: currentPos.x,
-                    y: currentPos.y + (y * moveSpeed),
-                    z: currentPos.z
-                };
-                
-                newPos = applyBoundaries(newPos);
-                rig.setAttribute('position', newPos);
-            }
-            
-            if (Math.abs(x) > 0.1) {
-                // Rotation
-                const currentRot = rig.getAttribute('rotation');
-                rig.setAttribute('rotation', {
-                    x: currentRot.x,
-                    y: currentRot.y + (x * 2),
-                    z: currentRot.z
-                });
-            }
-        }
-
-        function applyBoundaries(pos) {
-            // Keep player within bounds
-            pos.x = Math.max(-18, Math.min(18, pos.x));
-            pos.y = Math.max(0.5, Math.min(10, pos.y));
-            pos.z = Math.max(-18, Math.min(18, pos.z));
-            return pos;
         }
 
         function handleControllerClick(event) {
@@ -254,8 +126,8 @@
             gameActive = true;
             
             // Reset player position
-            rig.setAttribute('position', '0 1.6 3');
-            rig.setAttribute('rotation', '0 0 0');
+            const rig = document.querySelector('#rig');
+            rig.setAttribute('position', '0 0 3');
             
             // Update displays
             updateScore();
@@ -345,7 +217,7 @@
             // Random position across larger area
             const x = (Math.random() - 0.5) * 16;
             const startY = -2;
-            const z = (Math.random() - 0.5) * 16 - 3;
+            const z = (Math.random() - 0.5) * 16;
             
             // Create different shapes based on current setting
             switch(targetShape) {
@@ -377,4 +249,106 @@
             target.setAttribute('color', shapeColors[shapeIndex]);
             target.setAttribute('class', 'target');
             
+            // Add click event for destruction
+            target.addEventListener('click', function() {
+                if (gameActive) {
+                    destroyTarget(target);
+                }
+            });
             
+            scene.appendChild(target);
+            
+            // Animate target up and down
+            animateTarget(target, x, z);
+        }
+
+        function animateTarget(target, x, z) {
+            // Rise up
+            target.setAttribute('animation__up', {
+                property: 'position',
+                to: `${x} 3 ${z}`,
+                dur: targetSpeed,
+                easing: 'easeOutQuad'
+            });
+            
+            // Fall down after reaching top
+            setTimeout(() => {
+                if (target.parentNode && gameActive) {
+                    target.setAttribute('animation__down', {
+                        property: 'position',
+                        to: `${x} -2 ${z}`,
+                        dur: targetSpeed,
+                        easing: 'easeInQuad'
+                    });
+                    
+                    // Remove target after falling
+                    setTimeout(() => {
+                        if (target.parentNode) {
+                            target.parentNode.removeChild(target);
+                        }
+                    }, targetSpeed);
+                }
+            }, targetSpeed);
+        }
+
+        function destroyTarget(target) {
+            if (!gameActive) return;
+            
+            // Increase score
+            score += 10;
+            updateScore();
+            
+            // Visual destruction effect
+            target.setAttribute('animation__destroy', {
+                property: 'scale',
+                to: '0 0 0',
+                dur: 200
+            });
+            
+            // Remove from scene
+            setTimeout(() => {
+                if (target.parentNode) {
+                    target.parentNode.removeChild(target);
+                }
+            }, 200);
+        }
+
+        function setupControls() {
+            // Size control
+            document.querySelector('#sizeControl').addEventListener('click', function() {
+                if (!gameActive) return;
+                targetSize = targetSize >= 1.5 ? 0.5 : targetSize + 0.25;
+                this.setAttribute('color', targetSize > 1 ? 'darkred' : 'red');
+            });
+            
+            // Speed control
+            document.querySelector('#speedControl').addEventListener('click', function() {
+                if (!gameActive) return;
+                if (targetSpeed > 1000) {
+                    targetSpeed -= 500;
+                    this.setAttribute('color', 'darkblue');
+                } else {
+                    targetSpeed = 2500;
+                    this.setAttribute('color', 'blue');
+                }
+            });
+            
+            // Shape control
+            document.querySelector('#shapeControl').addEventListener('click', function() {
+                if (!gameActive) return;
+                
+                // Cycle through shapes
+                shapeIndex = (shapeIndex + 1) % shapes.length;
+                targetShape = shapes[shapeIndex];
+                
+                // Update button color to match current shape
+                this.setAttribute('color', shapeColors[shapeIndex]);
+                
+                // Update button text to show current shape
+                const shapeText = this.querySelector('a-text');
+                shapeText.setAttribute('value', targetShape.toUpperCase());
+            });
+        }
+    </script>
+</body>
+</html>
