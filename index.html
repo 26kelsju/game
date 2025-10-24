@@ -1,66 +1,303 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR Target Shooting Game</title>
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-    <script src="game.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+    </style>
 </head>
 <body>
-    <a-scene background="color: #87CEEB" vr-mode-ui="enabled: true">
-        <!-- VR Camera rig -->
-        <a-entity id="rig" position="0 0 3">
-            <!-- Camera -->
-            <a-camera id="camera" position="0 1.6 0">
+    <a-scene 
+        background="color: #87CEEB" 
+        vr-mode-ui="enabled: true" 
+        embedded 
+        style="height: 100vh; width: 100vw;">
+        
+        <!-- Assets -->
+        <a-assets>
+            <a-mixin id="target-mixin" 
+                     shadow="cast: true" 
+                     animation__hover="property: scale; to: 1.1 1.1 1.1; startEvents: mouseenter; dur: 200"
+                     animation__unhover="property: scale; to: 1 1 1; startEvents: mouseleave; dur: 200">
+            </a-mixin>
+        </a-assets>
+
+        <!-- Player Rig with VR Support -->
+        <a-entity id="playerRig" 
+                  position="0 0 5" 
+                  movement-controls="fly: false; constrainToNavMesh: false">
+            
+            <!-- Main Camera -->
+            <a-camera id="playerCamera" 
+                      position="0 1.6 0"
+                      look-controls="pointerLockEnabled: true"
+                      wasd-controls="acceleration: 20">
+                
+                <!-- Crosshair for Desktop -->
                 <a-cursor 
+                    id="cursor"
                     position="0 0 -1"
-                    geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                    material="color: white; shader: flat"
-                    raycaster="objects: .target, .control, .gameOver">
+                    geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02"
+                    material="color: white; opacity: 0.8"
+                    raycaster="objects: .clickable; far: 50"
+                    animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; to: 0.1 0.1 0.1"
+                    animation__clickreset="property: scale; startEvents: animationcomplete__click; easing: easeOutCubic; dur: 300; to: 1 1 1">
                 </a-cursor>
             </a-camera>
             
-            <!-- VR Controllers -->
-            <a-entity id="rightController" 
-                      oculus-touch-controls="hand: right"
-                      raycaster="objects: .target, .control, .gameOver; lineColor: red; lineOpacity: 0.5"
-                      line="color: red; opacity: 0.75">
+            <!-- Left VR Controller -->
+            <a-entity id="leftHand" 
+                      oculus-touch-controls="hand: left; model: true"
+                      raycaster="objects: .clickable; lineColor: #00ff00; lineOpacity: 0.6; far: 50"
+                      line="color: #00ff00; opacity: 0.6; visible: false"
+                      laser-controls>
             </a-entity>
             
-            <a-entity id="leftController" 
-                      oculus-touch-controls="hand: left"
-                      raycaster="objects: .target, .control, .gameOver; lineColor: blue; lineOpacity: 0.5"
-                      line="color: blue; opacity: 0.75">
+            <!-- Right VR Controller -->
+            <a-entity id="rightHand" 
+                      oculus-touch-controls="hand: right; model: true"
+                      raycaster="objects: .clickable; lineColor: #ff0000; lineOpacity: 0.6; far: 50"
+                      line="color: #ff0000; opacity: 0.6; visible: false"
+                      laser-controls>
             </a-entity>
         </a-entity>
-        
-        <!-- Expanded Ground for movement -->
-        <a-plane position="0 0 0" rotation="-90 0 0" width="40" height="40" color="#4CC3D9"></a-plane>
-        
-        <!-- Control panel -->
-        <a-box id="sizeControl" class="control" position="-3 2 -3" width="1" height="0.5" depth="0.1" color="red">
-            <a-text value="SIZE" position="0 0 0.06" align="center" color="white"></a-text>
-        </a-box>
-        
-        <a-box id="speedControl" class="control" position="3 2 -3" width="1" height="0.5" depth="0.1" color="blue">
-            <a-text value="SPEED" position="0 0 0.06" align="center" color="white"></a-text>
-        </a-box>
-        
-        <a-box id="shapeControl" class="control" position="0 2 -3" width="1" height="0.5" depth="0.1" color="green">
-            <a-text value="SHAPE" position="0 0 0.06" align="center" color="white"></a-text>
-        </a-box>
-        
-        <!-- Movement Instructions -->
-        <a-text id="movementInstructions" position="0 4 -3" value="VR: Left thumbstick moves | Right thumbstick turns | Desktop: WASD + mouse" align="center" color="white"></a-text>
-        
-        <!-- Score and Timer display -->
-        <a-text id="scoreText" position="0 3 -3" value="Score: 0" align="center" color="black"></a-text>
-        <a-text id="timerText" position="0 3.5 -3" value="Time: 30" align="center" color="green"></a-text>
 
-        <!-- Game Over Screen (initially hidden) -->
-        <a-plane id="gameOverScreen" class="gameOver" position="0 1.5 -2.5" width="6" height="4" color="black" opacity="0.8" visible="false">
-            <a-text id="gameOverText" position="0 0.5 0.01" value="GAME OVER!" align="center" color="red"></a-text>
-            <a-text id="finalScoreText" position="0 0 0.01" value="Final Score: 0" align="center" color="white"></a-text>
-            <a-text id="restartText" position="0 -0.5 0.01" value="Point and click to restart" align="center" color="yellow"></a-text>
-        </a-plane>
+        <!-- Game Environment -->
+        <a-entity id="environment">
+            <!-- Main Ground -->
+            <a-plane id="ground" 
+                     position="0 0 0" 
+                     rotation="-90 0 0" 
+                     width="60" 
+                     height="60" 
+                     color="#4CC3D9" 
+                     shadow="receive: true"
+                     material="roughness: 0.8">
+            </a-plane>
+            
+            <!-- Boundary Walls (Invisible) -->
+            <a-box position="30 5 0" width="1" height="10" depth="60" visible="false"></a-box>
+            <a-box position="-30 5 0" width="1" height="10" depth="60" visible="false"></a-box>
+            <a-box position="0 5 30" width="60" height="10" depth="1" visible="false"></a-box>
+            <a-box position="0 5 -30" width="60" height="10" depth="1" visible="false"></a-box>
+            
+            <!-- Decorative Elements -->
+            <a-cylinder position="15 1 15" radius="2" height="2" color="#228B22" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="-15 1 15" radius="2" height="2" color="#228B22" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="15 1 -15" radius="2" height="2" color="#228B22" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="-15 1 -15" radius="2" height="2" color="#228B22" shadow="cast: true"></a-cylinder>
+        </a-entity>
+
+        <!-- Control Panel -->
+        <a-entity id="controlPanel" position="0 2.5 -2">
+            <!-- Size Control Button -->
+            <a-entity id="sizeBtn" class="clickable control">
+                <a-box width="1.8" 
+                       height="0.8" 
+                       depth="0.15" 
+                       color="#ff4444"
+                       material="roughness: 0.3"
+                       position="-2.5 0 0"
+                       shadow="cast: true"
+                       animation__hover="property: position; to: -2.5 0.1 0; startEvents: mouseenter; dur: 200"
+                       animation__unhover="property: position; to: -2.5 0 0; startEvents: mouseleave; dur: 200">
+                </a-box>
+                <a-text value="SIZE" 
+                        position="-2.5 0 0.08" 
+                        align="center" 
+                        color="white" 
+                        font="kelsonsans"
+                        width="12">
+                </a-text>
+            </a-entity>
+            
+            <!-- Speed Control Button -->
+            <a-entity id="speedBtn" class="clickable control">
+                <a-box width="1.8" 
+                       height="0.8" 
+                       depth="0.15" 
+                       color="#44ff44"
+                       material="roughness: 0.3"
+                       position="0 0 0"
+                       shadow="cast: true"
+                       animation__hover="property: position; to: 0 0.1 0; startEvents: mouseenter; dur: 200"
+                       animation__unhover="property: position; to: 0 0 0; startEvents: mouseleave; dur: 200">
+                </a-box>
+                <a-text value="SPEED" 
+                        position="0 0 0.08" 
+                        align="center" 
+                        color="white" 
+                        font="kelsonsans"
+                        width="12">
+                </a-text>
+            </a-entity>
+            
+            <!-- Shape Control Button -->
+            <a-entity id="shapeBtn" class="clickable control">
+                <a-box width="1.8" 
+                       height="0.8" 
+                       depth="0.15" 
+                       color="#4444ff"
+                       material="roughness: 0.3"
+                       position="2.5 0 0"
+                       shadow="cast: true"
+                       animation__hover="property: position; to: 2.5 0.1 0; startEvents: mouseenter; dur: 200"
+                       animation__unhover="property: position; to: 2.5 0 0; startEvents: mouseleave; dur: 200">
+                </a-box>
+                <a-text value="SHAPE" 
+                        position="2.5 0 0.08" 
+                        align="center" 
+                        color="white" 
+                        font="kelsonsans"
+                        width="12">
+                </a-text>
+            </a-entity>
+        </a-entity>
+
+        <!-- Game UI -->
+        <a-entity id="gameUI" position="0 4 -2">
+            <!-- Score Display -->
+            <a-entity id="scoreDisplay">
+                <a-plane width="3" 
+                         height="0.8" 
+                         color="black" 
+                         opacity="0.7" 
+                         position="-2 0 -0.01">
+                </a-plane>
+                <a-text value="Score: 0" 
+                        position="-2 0 0" 
+                        align="center" 
+                        color="#00ff00" 
+                        font="kelsonsans"
+                        width="16">
+                </a-text>
+            </a-entity>
+            
+            <!-- Timer Display -->
+            <a-entity id="timerDisplay">
+                <a-plane width="3" 
+                         height="0.8" 
+                         color="black" 
+                         opacity="0.7" 
+                         position="2 0 -0.01">
+                </a-plane>
+                <a-text value="Time: 30" 
+                        position="2 0 0" 
+                        align="center" 
+                        color="#00ff00" 
+                        font="kelsonsans"
+                        width="16">
+                </a-text>
+            </a-entity>
+            
+            <!-- Instructions -->
+            <a-text id="instructions" 
+                    value="VR: Use thumbsticks to move, triggers to shoot | Desktop: WASD + mouse" 
+                    position="0 -1 0" 
+                    align="center" 
+                    color="white" 
+                    font="kelsonsans"
+                    width="8">
+            </a-text>
+        </a-entity>
+
+        <!-- Game Over Screen -->
+        <a-entity id="gameOverScreen" visible="false" position="0 2 -1.5">
+            <!-- Background Panel -->
+            <a-plane width="10" 
+                     height="6" 
+                     color="black" 
+                     opacity="0.9" 
+                     class="clickable"
+                     material="transparent: true"
+                     animation__show="property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic">
+            </a-plane>
+            
+            <!-- Game Over Text -->
+            <a-text id="gameOverText" 
+                    value="GAME OVER!" 
+                    position="0 1.5 0.01" 
+                    align="center" 
+                    color="#ff0000" 
+                    font="kelsonsans"
+                    width="20"
+                    animation__pulse="property: scale; to: 1.1 1.1 1.1; dir: alternate; dur: 1000; loop: true">
+            </a-text>
+            
+            <!-- Final Score -->
+            <a-text id="finalScore" 
+                    value="Final Score: 0" 
+                    position="0 0.5 0.01" 
+                    align="center" 
+                    color="white" 
+                    font="kelsonsans"
+                    width="16">
+            </a-text>
+            
+            <!-- Restart Instructions -->
+            <a-text value="Click anywhere to restart" 
+                    position="0 -0.5 0.01" 
+                    align="center" 
+                    color="#ffff00" 
+                    font="kelsonsans"
+                    width="12"
+                    animation__blink="property: opacity; to: 0.3; dir: alternate; dur: 1000; loop: true">
+            </a-text>
+            
+            <!-- Decorative Border -->
+            <a-ring position="0 0 0.005" 
+                    radius-inner="4.5" 
+                    radius-outer="4.8" 
+                    color="#ffffff" 
+                    opacity="0.3">
+            </a-ring>
+        </a-entity>
+
+        <!-- Lighting Setup -->
+        <a-entity id="lighting">
+            <!-- Ambient Light -->
+            <a-light type="ambient" 
+                     color="#404040" 
+                     intensity="0.4">
+            </a-light>
+            
+            <!-- Main Directional Light -->
+            <a-light type="directional" 
+                     position="10 15 5" 
+                     color="#ffffff" 
+                     intensity="0.8"
+                     shadow="type: pcf; mapSize: 2048; camera: -30 30 30 -30 -1 50"
+                     target="#ground">
+            </a-light>
+            
+            <!-- Fill Light -->
+            <a-light type="point" 
+                     position="-10 10 -5" 
+                     color="#8888ff" 
+                     intensity="0.3">
+            </a-light>
+            
+            <!-- Accent Light -->
+            <a-light type="point" 
+                     position="0 8 0" 
+                     color="#ffff88" 
+                     intensity="0.2">
+            </a-light>
+        </a-entity>
+
+        <!-- Sky -->
+        <a-sky color="#87CEEB" 
+               material="shader: gradient; topColor: #87CEEB; bottomColor: #98D8E8">
+        </a-sky>
     </a-scene>
+
+    <!-- Load Game Script -->
+    <script src="game.js"></script>
 </body>
 </html>
